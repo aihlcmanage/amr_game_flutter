@@ -180,15 +180,15 @@ class GameScreen extends ConsumerWidget {
 
   // カテゴリ名を日本語で返すヘルパー関数
   String _getCategoryName(WeaponCategory category) {
-    // Enumメンバーのアクセスエラーに対応するため、メンバー名をPascalCaseに修正
+    // Enumメンバーのアクセスエラーに対応するため、メンバー名をSnakeCaseに修正
     switch (category) {
-      case WeaponCategory.BetaLactam: // ★ 再修正: PascalCase
+      case WeaponCategory.beta_lactam: // ★ 再々修正: SnakeCase
         return 'ベータラクタム系';
-      case WeaponCategory.Fluoroquinolone: // ★ 再修正: PascalCase
+      case WeaponCategory.fluoroquinolone: // ★ 再々修正: SnakeCase
         return 'フルオロキノロン系';
-      case WeaponCategory.Glycopeptide: // ★ 再修正: PascalCase
+      case WeaponCategory.glycopeptide: // ★ 再々修正: SnakeCase
         return 'グリコペプチド系';
-      case WeaponCategory.Other: // ★ 再修正: PascalCase
+      case WeaponCategory.other: // ★ 再々修正: SnakeCase
         return 'その他';
       default:
         // 未定義のカテゴリをnameで表示
@@ -198,15 +198,15 @@ class GameScreen extends ConsumerWidget {
 
   // カテゴリごとに色を返すヘルパー関数
   Color _getCategoryColor(WeaponCategory category) {
-    // Enumメンバーのアクセスエラーに対応するため、メンバー名をPascalCaseに修正
+    // Enumメンバーのアクセスエラーに対応するため、メンバー名をSnakeCaseに修正
     switch (category) {
-      case WeaponCategory.BetaLactam: // ★ 再修正: PascalCase
+      case WeaponCategory.beta_lactam: // ★ 再々修正: SnakeCase
         return Colors.green.shade600;
-      case WeaponCategory.Fluoroquinolone: // ★ 再修正: PascalCase
+      case WeaponCategory.fluoroquinolone: // ★ 再々修正: SnakeCase
         return Colors.blue.shade600;
-      case WeaponCategory.Glycopeptide: // ★ 再修正: PascalCase
+      case WeaponCategory.glycopeptide: // ★ 再々修正: SnakeCase
         return Colors.purple.shade600;
-      case WeaponCategory.Other: // ★ 再修正: PascalCase
+      case WeaponCategory.other: // ★ 再々修正: SnakeCase
         return Colors.orange.shade600;
       default:
         return Colors.grey;
