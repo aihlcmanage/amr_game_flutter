@@ -71,7 +71,7 @@ class GameScreen extends ConsumerWidget {
             // アクションボタンエリア
             // Notifierのゲッターを直接呼び出し
             if (!notifier.isGameOver) ...[ 
-              _buildWeaponActions(ref),
+              _buildWeaponActions(ref), // ★ 投薬アクションの表示を修正
               const SizedBox(height: 20),
               _buildSupportActions(ref, state),
             ] else ...[
@@ -114,27 +114,94 @@ class GameScreen extends ConsumerWidget {
     );
   }
 
+  // ★修正: 攻撃（投薬）ボタンをカテゴリごとにグループ化
   Widget _buildWeaponActions(WidgetRef ref) {
+    // カテゴリごとに武器を分類
+    final categorizedWeapons = { for (var category in WeaponCategory.values) category: <WeaponData>[] };
+    for (var weapon in WEAPON_DATA) {
+      categorizedWeapons[weapon.category]?.add(weapon);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('⚔️ 兵器アクション (投薬)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8.0,
-          runSpacing: 8.0,
-          children: WEAPON_DATA.map((weapon) {
-            return ElevatedButton(
-              onPressed: () {
-                ref.read(gameNotifierProvider.notifier).applyTreatment(weapon);
-              },
-              child: Text(weapon.name),
-            );
-          }).toList(),
-        ),
+        const Text('⚔️ 投薬アクション (兵器選択)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        
+        // カテゴリごとにボタンを表示
+        ...categorizedWeapons.keys.map((category) {
+          final weapons = categorizedWeapons[category]!;
+          if (weapons.isEmpty) return const SizedBox.shrink();
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // カテゴリ名
+                Text(
+                  _getCategoryName(category), 
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.blueGrey),
+                ),
+                const SizedBox(height: 8),
+                // 武器ボタン
+                Wrap(
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: weapons.map((weapon) {
+                    return ElevatedButton(
+                      onPressed: () {
+                        ref.read(gameNotifierProvider.notifier).applyTreatment(weapon);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _getCategoryColor(category), // カテゴリごとに色を変える
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text(weapon.name),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ],
     );
   }
+
+  // カテゴリ名を日本語で返すヘルパー関数
+  String _getCategoryName(WeaponCategory category) {
+    switch (category) {
+      case WeaponCategory.BetaLactam:
+        return 'ベータラクタム系';
+      case WeaponCategory.Fluoroquinolone:
+        return 'フルオロキノロン系';
+      case WeaponCategory.Glycopeptide:
+        return 'グリコペプチド系';
+      case WeaponCategory.Other:
+        return 'その他';
+      default:
+        return '未分類';
+    }
+  }
+
+  // カテゴリごとに色を返すヘルパー関数
+  Color _getCategoryColor(WeaponCategory category) {
+    switch (category) {
+      case WeaponCategory.BetaLactam:
+        return Colors.green.shade600;
+      case WeaponCategory.Fluoroquinolone:
+        return Colors.blue.shade600;
+      case WeaponCategory.Glycopeptide:
+        return Colors.purple.shade600;
+      case WeaponCategory.Other:
+        return Colors.orange.shade600;
+      default:
+        return Colors.grey;
+    }
+  }
+
 
   Widget _buildSupportActions(WidgetRef ref, GameState state) {
     return Column(
