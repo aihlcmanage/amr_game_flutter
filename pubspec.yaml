@@ -1,0 +1,22 @@
+name: antibiotic_amr_game_flutter
+description: A game for training antibiotic risk management and appropriate use principles, leveraging the AWaRe classification.
+
+# SDK制約を追記しました。これが 'flutter pub get' 失敗の原因でした。
+environment:
+  sdk: '>=3.0.0 <4.0.0' # Dartのバージョン制約。Flutter 3.10以降に対応。
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # 状態管理のために必要なライブラリを追加します。
+  flutter_riverpod: ^2.5.1 # 最新の安定版バージョンを使用
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0 # Linting rules for code quality
+  
+# Flutter固有の設定
+flutter:
+  uses-material-design: true
