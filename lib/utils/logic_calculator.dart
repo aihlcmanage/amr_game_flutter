@@ -1,6 +1,6 @@
 import '../models/models.dart';
 import '../state/game_state.dart';
-import '../models/enums.dart'; // ★修正: 列挙型の型定義に必要
+import '../models/enums.dart'; // 列挙型の型定義に必要
 
 class LogicCalculator {
   
@@ -39,23 +39,22 @@ class LogicCalculator {
     required AntibioticWeapon weapon,
     required BacterialEnemy enemy,
   }) {
+    // 武器データから抵抗リスク係数を取得
     double baseRisk = weapon.resistanceRiskFactor * enemy.resistanceAcquisitionRate;
     
-    // Reserve薬（メテオ/浄化）はリスクを倍加
-    if (weapon.category == WeaponCategory.Reserve) {
-      baseRisk *= 2.0;
-    }
+    // Reserve薬はresistanceRiskFactor自体が大きく設定されているため、ここでは追加の倍加処理は不要とする。
+    // models.dartのデータ定義でリスクをコントロール。
     
     return baseRisk;
   }
   
   static double calculateNewSensitivity(double currentRisk, double currentSensitivity) {
-    const double threshold = 5.0; // 耐性獲得の閾値
-    const double sensitivityDrop = 0.1; // 感受性の低下量
+    const double threshold = 5.0; // 耐性獲得の閾値 (変更なし)
+    const double sensitivityDrop = 0.1; 
     
     // リスクが閾値を超えた場合にのみ感受性を低下させる
     if (currentRisk >= threshold) {
-      return currentSensitivity - sensitivityDrop;
+      return (currentSensitivity - sensitivityDrop).clamp(0.0, 1.0);
     }
     return currentSensitivity;
   }

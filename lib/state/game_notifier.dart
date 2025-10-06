@@ -6,7 +6,6 @@ import 'game_state.dart';
 
 // GameNotifierのインスタンスを提供するProvider
 final gameNotifierProvider = StateNotifierProvider<GameNotifier, GameState>((ref) {
-  // 初期状態は仮のデータで設定（startGameで上書きされる）
   final initialCase = CASE_DATA.first;
   final initialEnemy = ENEMY_DATA.firstWhere((e) => e.id == initialCase.enemyId);
 
@@ -29,11 +28,9 @@ class GameNotifier extends StateNotifier<GameState> {
   // ゲッター (勝利・敗北判定)
   // --------------------------------------------------
   bool get isGameOver {
-    // 敗北条件
     if (state.currentSeverity >= 100.0) {
       return true;
     }
-    // 勝利条件 (重症度が安全域で、かつ最低3ターンは治療が行われた場合)
     if (state.currentSeverity <= 10.0 && state.currentTurn >= 3) {
       return true;
     }
@@ -47,7 +44,6 @@ class GameNotifier extends StateNotifier<GameState> {
   void startGame(PatientCase selectedCase) {
     final initialEnemy = ENEMY_DATA.firstWhere((e) => e.id == selectedCase.enemyId);
     
-    // 選択された症例に合わせて状態を初期化
     state = GameState(
       currentCase: selectedCase,
       currentEnemy: initialEnemy,
@@ -58,7 +54,7 @@ class GameNotifier extends StateNotifier<GameState> {
       currentTurn: 1,
       logMessages: ['ゲーム開始: ${selectedCase.name} の治療が始まりました。'],
       principleComplianceScore: 0,
-      lastWeaponCategory: null, // 初期状態をnullに設定
+      lastWeaponCategory: null,
     );
   }
 
@@ -67,7 +63,7 @@ class GameNotifier extends StateNotifier<GameState> {
   // --------------------------------------------------
 
   void applyTreatment(AntibioticWeapon weapon) {
-    if (isGameOver) return; // ゲームオーバー時は処理しない
+    if (isGameOver) return;
 
     final currentEnemy = state.currentEnemy;
     final currentCase = state.currentCase;
@@ -101,20 +97,17 @@ class GameNotifier extends StateNotifier<GameState> {
     int newPrincipleComplianceScore = state.principleComplianceScore;
     String educationLog = '';
     
-    if (state.turnsUntilDiagnosis <= 0) { // 検査結果が出ている場合
+    if (state.turnsUntilDiagnosis <= 0) {
         if (state.lastWeaponCategory != null && 
             state.lastWeaponCategory != WeaponCategory.Access && 
             weapon.category == WeaponCategory.Access) 
         {
-            // De-escalation成功
             newPrincipleComplianceScore += 200; 
             educationLog = '✅ 成功！Access薬へ**ステップダウン**しました。原則遵守ボーナス (+200)。';
         } else if (weapon.category != WeaponCategory.Access) {
-             // 検査結果が出ているのに広域を継続
             educationLog = '💡 思考: 広域薬の継続は、耐性リスクを不必要に高めます。切り替えを検討してください。';
         }
     } else {
-         // 検査結果待ち（初期治療）期間
          if (weapon.category == WeaponCategory.Reserve) {
              educationLog = '🚨 警告: 検査結果待ちにReserve薬を使用。過剰な治療は避けてください！';
          }
@@ -123,15 +116,20 @@ class GameNotifier extends StateNotifier<GameState> {
     // --- (D) 状態更新（ターン終了処理を含む）---
     
     // 敵の増殖による重症度増加
-    final double severityIncrease = currentEnemy.severityIncreaseRate;
+    double severityIncrease = currentEnemy.severityIncreaseRate;
+    
+    // ★修正: Reserve薬使用の場合、副作用による体調悪化で重症度増加係数が増える
+    if (weapon.reboundSeverityFactor > 1.0) {
+        severityIncrease *= weapon.reboundSeverityFactor;
+        educationLog += ' 副作用反動により、重症度増加速度が ${weapon.reboundSeverityFactor.toStringAsFixed(1)} 倍になりました。';
+    }
     
     // 新しい重症度 (ダメージ減少後、敵の増殖分増加)
     final double newSeverity = (state.currentSeverity - finalDamage).clamp(0.0, 100.0) + severityIncrease;
     
     // ログメッセージの生成
     final List<String> newLogs = [
-      '治療実施: ${weapon.name} を投薬。重症度を ${finalDamage.toInt()} 減少。',
-      '⚠️ 警告: 耐性リスク $riskIncrease.toStringAsFixed(2) 加算。副作用コスト $costIncrease.toStringAsFixed(1) 増加。',
+      '治療実施: ${weapon.name} を投薬。ダメージ: ${finalDamage.toInt()} | リスク: ${riskIncrease.toStringAsFixed(2)} | コスト: ${costIncrease.toStringAsFixed(1)}',
       if (educationLog.isNotEmpty) educationLog,
       if (newSensitivity < state.currentSensitivityScore) '🚨 ペナルティ: 耐性獲得の閾値を超えました。感受性が ${newSensitivity.toStringAsFixed(2)} に低下！',
       ...state.logMessages,
@@ -146,7 +144,7 @@ class GameNotifier extends StateNotifier<GameState> {
       turnsUntilDiagnosis: (state.turnsUntilDiagnosis - 1).clamp(0, currentCase.diagnosisDelayTurns),
       logMessages: newLogs,
       principleComplianceScore: newPrincipleComplianceScore,
-      lastWeaponCategory: weapon.category, // 最後に使用した武器を記録
+      lastWeaponCategory: weapon.category,
     );
   }
 
@@ -168,7 +166,6 @@ class GameNotifier extends StateNotifier<GameState> {
       );
     } 
     else if (action == SupportAction.SourceControl) {
-      // 感染源制御は重症度を大きく下げ、耐性リスクをリセットする
       final double severityReduction = 40.0;
       log = '✅ 感染源制御実施！重症度を ${severityReduction.toInt()} 減少させ、耐性リスクをリセットしました。';
       
@@ -179,7 +176,6 @@ class GameNotifier extends StateNotifier<GameState> {
       );
     }
     
-    // サポートアクション後もターンは進行する
     turnProceedAfterSupport();
   }
 
