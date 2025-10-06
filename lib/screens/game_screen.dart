@@ -132,7 +132,7 @@ class GameScreen extends ConsumerWidget {
           height: 50, // ボタンの高さに応じて調整
           child: ListView(
             scrollDirection: Axis.horizontal,
-            spacing: 8.0,
+            // ❌ 存在しないspacingパラメーターを削除
             children: weapons.map((weapon) {
               return Padding(
                 padding: const EdgeInsets.only(right: 8.0), // ボタン間のスペース
