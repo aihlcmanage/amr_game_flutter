@@ -46,7 +46,7 @@ class EnemyDisplay extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            gameState.currentEnemy.name,
+            '標的菌 (推測): ${gameState.currentEnemy.name}',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           Text(

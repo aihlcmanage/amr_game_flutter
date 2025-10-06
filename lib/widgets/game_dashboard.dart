@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../state/game_state.dart';
+import '../state/game_notifier.dart'; // TARGET_TURN_FOR_WARNINGの取得
 
 class GameDashboard extends StatelessWidget {
   final GameState gameState;
@@ -34,6 +35,12 @@ class GameDashboard extends StatelessWidget {
       diagnosisText = '🔍 診断まで: ${gameState.turnsUntilDiagnosis}ターン';
       diagnosisColor = Colors.orange;
     }
+    
+    // ターン超過警告の表示
+    String turnWarning = '';
+    if (gameState.currentTurn > TARGET_TURN_FOR_WARNING) {
+        turnWarning = ' (警告超過)';
+    }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -42,7 +49,7 @@ class GameDashboard extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('敵 (推測): ${gameState.currentEnemy.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('症例: ${gameState.currentCase.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
             Text('感受性: ${gameState.currentSensitivityScore.toStringAsFixed(2)}', style: TextStyle(color: gameState.currentSensitivityScore < 0.5 ? Colors.red : Colors.grey)),
           ],
         ),
@@ -50,7 +57,7 @@ class GameDashboard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(diagnosisText, style: TextStyle(color: diagnosisColor, fontWeight: FontWeight.bold, fontSize: 13)),
-            Text('原則遵守点: ${gameState.principleComplianceScore}', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+            Text('原則遵守点: ${gameState.principleComplianceScore}${turnWarning}', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
           ],
         ),
       ],
@@ -87,9 +94,11 @@ class GameDashboard extends StatelessWidget {
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeInOut,
             height: 8,
+            // アラート時は背景も色を付けて危険度を視覚化
+            color: isAlert ? progressColor.withOpacity(0.3) : Colors.grey[300],
             child: LinearProgressIndicator(
               value: normalizedValue,
-              backgroundColor: isAlert ? progressColor.withOpacity(0.3) : Colors.grey[300],
+              backgroundColor: Colors.transparent, // 背景はAnimatedContainerで設定
               valueColor: AlwaysStoppedAnimation<Color>(progressColor),
             ),
           ),

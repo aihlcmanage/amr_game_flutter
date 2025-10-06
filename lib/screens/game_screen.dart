@@ -4,7 +4,7 @@ import '../state/game_notifier.dart';
 import '../widgets/game_dashboard.dart'; 
 import '../widgets/action_cards.dart';   
 import '../widgets/log_panel.dart';      
-import '../widgets/enemy_display.dart'; // ★追加
+import '../widgets/enemy_display.dart'; 
 import 'result_screen.dart';
 
 class GameScreen extends ConsumerWidget {
@@ -26,17 +26,30 @@ class GameScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text('治療ターン: ${gameState.currentTurn} - ${gameState.currentCase.name}'),
         automaticallyImplyLeading: false, 
+        actions: [
+          // ★ギブアップボタン追加
+          TextButton.icon(
+            icon: const Icon(Icons.flag, color: Colors.grey),
+            label: const Text('ギブアップ', style: TextStyle(color: Colors.grey, fontSize: 13)),
+            onPressed: () {
+              ref.read(gameNotifierProvider.notifier).surrender();
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
           // 画面上部：リスクメーター
           GameDashboard(gameState: gameState),
           
-          // 中央上部: 敵のイメージ表示 (視覚化) ★追加
+          // 中央上部: 敵のイメージ表示 (視覚化)
           EnemyDisplay(gameState: gameState),
 
           // 中央下部：情報ログ
-          Expanded(child: LogPanel(logMessages: gameState.logMessages)),
+          // Expanded(child: LogPanel(logMessages: gameState.logMessages)), // 下で修正
+          Expanded(
+            child: LogPanel(logMessages: gameState.logMessages),
+          ),
           
           // 画面下部：アクションバー（投薬選択）
           ActionCards(gameState: gameState),

@@ -27,7 +27,7 @@ class LogPanel extends StatelessWidget {
             child: Text(
               _formatLogMessage(message),
               style: TextStyle(
-                fontSize: 13, // 文字サイズを拡大
+                fontSize: 14, // ★文字サイズを拡大
                 color: _getLogColor(message),
                 fontWeight: _isImportant(message) ? FontWeight.bold : FontWeight.normal,
               ),
@@ -42,7 +42,7 @@ class LogPanel extends StatelessWidget {
   Color _getLogColor(String message) {
     if (message.startsWith('🚨')) return Colors.red.shade700;
     if (message.startsWith('✅')) return Colors.green.shade700;
-    if (message.startsWith('💡')) return Colors.blue.shade700;
+    if (message.startsWith('🧠')) return Colors.blue.shade700;
     if (message.startsWith('⚠️')) return Colors.orange.shade700;
     return Colors.black87;
   }
@@ -55,9 +55,8 @@ class LogPanel extends StatelessWidget {
   // ログメッセージの絵文字置換とフォーマット
   String _formatLogMessage(String message) {
     return message
-        .replaceAll('治療実施', '💉 治療')
-        .replaceAll('警告: 耐性リスク', '⚠️ リスク')
-        .replaceAll('副作用コスト', '💊 コスト')
-        .replaceAll('💡 思考', '🧠 助言');
+        .replaceAll('💉 投薬', '💉 投薬')
+        .replaceAll('💡 思考', '🧠 助言')
+        .replaceAll('⚠️ 警告', '⚠️ 注意');
   }
 }

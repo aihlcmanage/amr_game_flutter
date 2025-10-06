@@ -6,6 +6,8 @@ import 'game_state.dart';
 
 // 目標ターン数を定数として定義 (10ターンを超過したら警告)
 const int TARGET_TURN_FOR_WARNING = 10;
+// 膠着状態と見なす最大許容ターン数
+const int MAX_ALLOWED_TURN = TARGET_TURN_FOR_WARNING * 2; // 20ターン
 
 // GameNotifierのインスタンスを提供するProvider
 final gameNotifierProvider = StateNotifierProvider<GameNotifier, GameState>((ref) {
@@ -32,10 +34,20 @@ class GameNotifier extends StateNotifier<GameState> {
   // ゲッター (勝利・敗北判定)
   // --------------------------------------------------
   bool get isGameOver {
-    // 敗北条件: 重症度100%
+    // 敗北条件 1: 重症度 100%
     if (state.currentSeverity >= 100.0) {
       return true;
     }
+    
+    // ★敗北条件 2: 膠着状態での強制終了 (重症度が10%を超えていて、ターン数が許容限界を超えた場合)
+    if (state.currentSeverity > 10.0 && state.currentTurn > MAX_ALLOWED_TURN) {
+        // ログに強制終了の理由を追加
+        state = state.copyWith(
+            logMessages: ['🚨 判定: 治療が長期化し、許容ターン数を超えました。治療失敗と判定されます。', ...state.logMessages]
+        );
+        return true;
+    }
+
     // 勝利条件: 重症度10%以下かつ最低3ターン経過
     if (state.currentSeverity <= 10.0 && state.currentTurn >= 3) {
       return true;
@@ -212,6 +224,19 @@ class GameNotifier extends StateNotifier<GameState> {
       currentSeverity: newSeverity,
       currentTurn: state.currentTurn + 1,
       turnsUntilDiagnosis: (state.turnsUntilDiagnosis - 1).clamp(0, state.currentCase.diagnosisDelayTurns),
+    );
+  }
+  
+  // --------------------------------------------------
+  // 5. ★ギブアップ機能
+  // --------------------------------------------------
+  void surrender() {
+    if (isGameOver) return;
+    
+    // ギブアップを敗北として処理するため、重症度を100%に設定し、ResultScreenに遷移させる
+    state = state.copyWith(
+      currentSeverity: 100.0,
+      logMessages: ['⛔️ ギブアップ: プレイヤーが治療を断念しました。治療失敗として評価されます。', ...state.logMessages],
     );
   }
 }

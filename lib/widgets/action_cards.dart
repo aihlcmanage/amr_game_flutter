@@ -17,14 +17,14 @@ class ActionCards extends ConsumerWidget {
       children: [
         // --- 1. 投薬アクション (WEAPON_DATA) ---
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          height: 100, // 高さを固定
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+          height: 130, // 高さ調整
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: WEAPON_DATA.map((weapon) {
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: _buildWeaponButton(notifier, weapon, gameState.currentCase.isAllergyRestrict),
+                child: _buildWeaponCard(notifier, weapon, gameState.currentCase.isAllergyRestrict),
               );
             }).toList(),
           ),
@@ -34,59 +34,88 @@ class ActionCards extends ConsumerWidget {
 
         // --- 2. サポートアクション (検査/感染源制御) ---
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildSupportButton(notifier, SupportAction.Inspection, '検査 (T-1)'),
-              _buildSupportButton(notifier, SupportAction.SourceControl, '感染源制御 (リスク↓)'),
+              _buildSupportCard(notifier, SupportAction.Inspection, '検査', Icons.search, Colors.blue),
+              _buildSupportCard(notifier, SupportAction.SourceControl, '感染源制御', Icons.clean_hands, Colors.purple),
             ],
           ),
         ),
       ],
     );
   }
-
-  // 武器ボタンの生成
-  Widget _buildWeaponButton(GameNotifier notifier, AntibioticWeapon weapon, bool isAllergyRestrict) {
-    final bool isDisabled = isAllergyRestrict && (weapon.id == 'W002' || weapon.id == 'W007'); // 例: アレルギーで剣と雷を制限
-
-    Color color;
+  
+  // 薬剤カテゴリに応じたアイコン設定
+  IconData _getWeaponIcon(AntibioticWeapon weapon) {
+    // 臨床的リアリティを意識したアイコン
     switch (weapon.category) {
-      case WeaponCategory.Access: color = Colors.green; break;
-      case WeaponCategory.Watch: color = Colors.orange; break;
-      case WeaponCategory.Reserve: color = Colors.red; break;
+      case WeaponCategory.Access: return Icons.health_and_safety; // アクセス/安全
+      case WeaponCategory.Watch: return Icons.military_tech;     // 監視/強力
+      case WeaponCategory.Reserve: return Icons.warning;         // 優先度高/危険
     }
+  }
 
-    return ElevatedButton(
-      onPressed: isDisabled ? null : () => notifier.applyTreatment(weapon),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color.withOpacity(0.8),
-        disabledBackgroundColor: Colors.grey.shade400,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(weapon.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text(weapon.category.name, style: const TextStyle(fontSize: 10)),
-          Text('D:${weapon.damageBase.toInt()} R:${(weapon.resistanceRiskFactor * 100).toInt()}%', style: const TextStyle(fontSize: 9)),
-          if (isDisabled) const Text('制限', style: TextStyle(fontSize: 9, color: Colors.black)),
-        ],
+  // 武器カードの生成
+  Widget _buildWeaponCard(GameNotifier notifier, AntibioticWeapon weapon, bool isAllergyRestrict) {
+    final bool isDisabled = isAllergyRestrict && (weapon.id == 'W002' || weapon.id == 'W007'); 
+
+    Color categoryColor;
+    switch (weapon.category) {
+      case WeaponCategory.Access: categoryColor = Colors.green.shade700; break;
+      case WeaponCategory.Watch: categoryColor = Colors.orange.shade700; break;
+      case WeaponCategory.Reserve: categoryColor = Colors.red.shade700; break;
+    }
+    
+    final Color cardColor = categoryColor.withOpacity(0.1);
+    final Color textColor = categoryColor;
+    
+    return Card(
+      elevation: 2,
+      color: isDisabled ? Colors.grey.shade300 : cardColor,
+      child: InkWell(
+        onTap: isDisabled ? null : () => notifier.applyTreatment(weapon),
+        child: Container(
+          width: 120,
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(_getWeaponIcon(weapon), size: 30, color: isDisabled ? Colors.grey.shade500 : textColor),
+              const SizedBox(height: 4),
+              Text(weapon.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDisabled ? Colors.grey.shade600 : textColor)),
+              Text('(${weapon.category.name})', style: TextStyle(fontSize: 11, color: isDisabled ? Colors.grey.shade600 : textColor)),
+              const SizedBox(height: 2),
+              Text('D:${weapon.damageBase.toInt()} R:${(weapon.resistanceRiskFactor * 100).toInt()}% C:${weapon.sideEffectCost.toInt()}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
+              if (isDisabled) const Text('🚫 制限', style: TextStyle(fontSize: 10, color: Colors.black, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  // サポートボタンの生成
-  Widget _buildSupportButton(GameNotifier notifier, SupportAction action, String label) {
-    return ElevatedButton.icon(
-      onPressed: () => notifier.performSupportAction(action),
-      icon: Icon(action == SupportAction.Inspection ? Icons.search : Icons.cut, size: 18),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blueGrey,
-        foregroundColor: Colors.white,
+  // サポートカードの生成
+  Widget _buildSupportCard(GameNotifier notifier, SupportAction action, String label, IconData icon, Color color) {
+    return Expanded(
+      child: Card(
+        elevation: 2,
+        color: color.withOpacity(0.1),
+        child: InkWell(
+          onTap: () => notifier.performSupportAction(action),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 20, color: color.shade700),
+                const SizedBox(width: 8),
+                Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: color.shade700)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
