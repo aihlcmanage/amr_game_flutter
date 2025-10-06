@@ -58,6 +58,7 @@ class GameNotifier extends StateNotifier<GameState> {
       currentTurn: 1,
       logMessages: ['ゲーム開始: ${selectedCase.name} の治療が始まりました。'],
       principleComplianceScore: 0,
+      lastWeaponCategory: null, // 初期状態をnullに設定
     );
   }
 

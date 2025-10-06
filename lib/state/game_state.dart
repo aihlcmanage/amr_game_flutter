@@ -1,8 +1,9 @@
 import '../models/models.dart';
+import '../models/enums.dart'; // WeaponCategoryの型に必要
 
 class GameState {
-  final PatientCase currentCase;
-  final BacterialEnemy currentEnemy;
+  final PatientCase currentCase;             // 現在の症例データ
+  final BacterialEnemy currentEnemy;         // 現在の敵データ
   
   final double currentSeverity;              // 現在の重症度 (0〜100)
   final double currentResistanceRisk;        // 現在の耐性リスクゲージ (累積値)
@@ -13,6 +14,7 @@ class GameState {
   final int turnsUntilDiagnosis;            // 検査結果までの残りターン
   final List<String> logMessages;           // 投薬結果やフィードバックのログ
   final int principleComplianceScore;       // 原則遵守ポイント
+  final WeaponCategory? lastWeaponCategory; // ★修正: 直前の武器カテゴリ
 
   // コンストラクタ（初期化用）
   GameState({
@@ -26,18 +28,35 @@ class GameState {
     this.turnsUntilDiagnosis = 0,
     this.logMessages = const [],
     this.principleComplianceScore = 0,
+    this.lastWeaponCategory,
   });
   
-  // 状態を変更するためのコピーメソッド (Riverpod/Freezed使用を想定)
+  // 状態を変更するためのコピーメソッド (copyWithを完全に実装)
   GameState copyWith({
-    // ... 各フィールドのコピーメソッド定義
+    PatientCase? currentCase,
+    BacterialEnemy? currentEnemy,
+    double? currentSeverity,
+    double? currentResistanceRisk,
+    double? currentSideEffectCost,
+    double? currentSensitivityScore,
+    int? currentTurn,
+    int? turnsUntilDiagnosis,
+    List<String>? logMessages,
+    int? principleComplianceScore,
+    WeaponCategory? lastWeaponCategory,
   }) {
     return GameState(
-      currentCase: currentCase,
-      currentEnemy: currentEnemy,
-      // ... 変更が必要なフィールドのみを上書き
-      currentSeverity: currentSeverity,
-      // ... 
+      currentCase: currentCase ?? this.currentCase,
+      currentEnemy: currentEnemy ?? this.currentEnemy,
+      currentSeverity: currentSeverity ?? this.currentSeverity,
+      currentResistanceRisk: currentResistanceRisk ?? this.currentResistanceRisk,
+      currentSideEffectCost: currentSideEffectCost ?? this.currentSideEffectCost,
+      currentSensitivityScore: currentSensitivityScore ?? this.currentSensitivityScore,
+      currentTurn: currentTurn ?? this.currentTurn,
+      turnsUntilDiagnosis: turnsUntilDiagnosis ?? this.turnsUntilDiagnosis,
+      logMessages: logMessages ?? this.logMessages,
+      principleComplianceScore: principleComplianceScore ?? this.principleComplianceScore,
+      lastWeaponCategory: lastWeaponCategory ?? this.lastWeaponCategory,
     );
   }
 }

@@ -1,5 +1,6 @@
 import '../models/models.dart';
 import '../state/game_state.dart';
+import '../models/enums.dart'; // ★修正: 列挙型の型定義に必要
 
 class LogicCalculator {
   
@@ -18,13 +19,13 @@ class LogicCalculator {
     // 抵抗メカニズム補正 (一致しない場合はダメージ減)
     if (enemy.primaryResistance != ResistanceMechanism.None && 
         weapon.counterMechanism != enemy.primaryResistance &&
-        weapon.category != WeaponCategory.Reserve // Reserve薬は強力で補正を一部無視
+        weapon.category != WeaponCategory.Reserve 
     ) {
       resistanceCorrection = 0.3; // ダメージを70%減
     }
     
     // 組織バリアー補正 (特定の薬が届きにくい場合)
-    if (enemy.isIntracellular && weapon.id == 'W002') { // 例: '剣(ソード)'は細胞内に届きにくい
+    if (enemy.isIntracellular && weapon.id == 'W002') { 
       resistanceCorrection *= 0.5; 
     }
 
