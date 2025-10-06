@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../models/enums.dart';
-import '../utils/logic_calculator.dart';
+import '../models/weapon_data.dart'; 
+import '../models/enemy_case_data.dart'; // ENEMY_DATA, CASE_DATAを含むと仮定
+import '../utils/logic_calculator.dart'; // LogicCalculatorクラスを含むと仮定
 import 'game_state.dart';
 
 // 目標ターン数を定数として定義 (10ターンを超過したら警告)
@@ -9,11 +11,18 @@ const int TARGET_TURN_FOR_WARNING = 10;
 // 膠着状態と見なす最大許容ターン数
 const int MAX_ALLOWED_TURN = TARGET_TURN_FOR_WARNING * 2; // 20ターン
 
-// GameNotifierのインスタンスを提供するProvider
+// GameNotifierのインスタンスを提供するProvider (初期化ロジック修正)
 final gameNotifierProvider = StateNotifierProvider<GameNotifier, GameState>((ref) {
+  // 実際のデータリストから初期値をロード
   final initialCase = CASE_DATA.first;
-  final initialEnemy = ENEMY_DATA.firstWhere((e) => e.id == initialCase.enemyId);
-
+  // NOTE: CASE_DATAにenemyId='E002'を含むC004があるため、ダミーのE002が存在すると仮定
+  final initialEnemyId = initialCase.enemyId;
+  final initialEnemy = ENEMY_DATA.firstWhere(
+    (e) => e.id == initialEnemyId,
+    // E002が存在しない場合のフォールバック（例：最初の敵）
+    orElse: () => ENEMY_DATA.first, 
+  );
+  
   return GameNotifier(
     GameState(
       currentCase: initialCase,
@@ -33,29 +42,28 @@ class GameNotifier extends StateNotifier<GameState> {
   // ゲッター (勝利・敗北判定)
   // --------------------------------------------------
   bool get isGameOver {
-    // 敗北条件 1: 重症度 100%
-    if (state.currentSeverity >= 100.0) {
-      return true;
-    }
+    // 勝利条件: 重症度が10%以下（かつターンが最低限経過していることを条件に追加）
+    final isSuccess = state.currentSeverity <= 10.0 && state.currentTurn >= 3;
     
-    // ★修正: 敗北条件 2: 膠着状態での強制終了 (純粋な判定のみ、状態変更は行わない)
-    if (state.currentSeverity > 10.0 && state.currentTurn > MAX_ALLOWED_TURN) {
-        return true;
-    }
+    // 敗北条件 1: 重症度が100%以上
+    final isFailureBySeverity = state.currentSeverity >= 100.0;
 
-    // 勝利条件: 重症度10%以下かつ最低3ターン経過
-    if (state.currentSeverity <= 10.0 && state.currentTurn >= 3) {
-      return true;
-    }
-    return false;
+    // 敗北条件 2: ターンオーバー（膠着敗北）
+    final isFailureByTurnLimit = state.currentTurn > MAX_ALLOWED_TURN;
+
+    return isSuccess || isFailureBySeverity || isFailureByTurnLimit;
   }
-  
+
   // --------------------------------------------------
   // 1. ゲームの初期化
   // --------------------------------------------------
 
   void startGame(PatientCase selectedCase) {
-    final initialEnemy = ENEMY_DATA.firstWhere((e) => e.id == selectedCase.enemyId);
+    final initialEnemyId = selectedCase.enemyId;
+    final initialEnemy = ENEMY_DATA.firstWhere(
+      (e) => e.id == initialEnemyId,
+      orElse: () => ENEMY_DATA.first, 
+    );
     
     state = GameState(
       currentCase: selectedCase,
@@ -68,6 +76,8 @@ class GameNotifier extends StateNotifier<GameState> {
       logMessages: ['ゲーム開始: ${selectedCase.name} の治療が始まりました。'],
       principleComplianceScore: 0,
       lastWeaponCategory: null,
+      currentSideEffectCost: 0.0,
+      // その他、GameStateに必要な初期フィールドを全て設定
     );
   }
 
@@ -88,6 +98,7 @@ class GameNotifier extends StateNotifier<GameState> {
       currentSensitivity: state.currentSensitivityScore,
       currentCase: currentCase,
     );
+    // sideEffectCostが実際のコスト計算に使用される
     final double costIncrease = LogicCalculator.calculateSideEffectCost(
       weapon: weapon, 
       currentCase: currentCase,
@@ -143,9 +154,9 @@ class GameNotifier extends StateNotifier<GameState> {
     // 新しい重症度 (ダメージ減少後、敵の増殖分増加)
     final double newSeverity = (state.currentSeverity - finalDamage).clamp(0.0, 100.0) + severityIncrease;
     
-    // ログメッセージの生成
+    // ログメッセージの生成（兵器名が反映されます）
     final List<String> newLogs = [
-      '💉 投薬: ${weapon.name} | Dmg: ${finalDamage.toInt()} | Risk: ${riskIncrease.toStringAsFixed(2)} | Cost: ${costIncrease.toStringAsFixed(1)}',
+      '💥 攻撃: ${weapon.name} | Dmg: ${finalDamage.toInt()} | Risk: ${riskIncrease.toStringAsFixed(2)} | Cost: ${costIncrease.toStringAsFixed(1)}',
       if (educationLog.isNotEmpty) educationLog,
       if (newSensitivity < state.currentSensitivityScore) '🚨 ペナルティ: 耐性獲得の閾値を超えました。感受性が ${newSensitivity.toStringAsFixed(2)} に低下！',
       ...state.logMessages,
@@ -225,20 +236,29 @@ class GameNotifier extends StateNotifier<GameState> {
   // --------------------------------------------------
   
   void recordEndGameLog() {
-    if (state.currentSeverity >= 100.0) {
-      // 敗北 100%
-      state = state.copyWith(
-          logMessages: ['🚨 判定: 重症度が100%に達し、治療失敗と判定されました。', ...state.logMessages]
-      );
-    } else if (state.currentSeverity > 10.0 && state.currentTurn > MAX_ALLOWED_TURN) {
-      // 敗北 膠着状態
-      state = state.copyWith(
-          logMessages: ['🚨 判定: 治療が長期化し、許容ターン数を超えました。治療失敗と判定されます。', ...state.logMessages]
-      );
-    } else if (state.currentSeverity <= 10.0) {
-      // 勝利
+    // ギブアップログがある場合は重複して記録しない
+    if (state.logMessages.first.startsWith('⛔️ ギブアップ')) {
+        return;
+    }
+
+    // 勝利条件判定には最低3ターン経過を含める
+    final isSuccess = state.currentSeverity <= 10.0 && state.currentTurn >= 3;
+    final isTurnOver = state.currentTurn > MAX_ALLOWED_TURN;
+
+    if (isSuccess && !isTurnOver) {
+      // ✅ 勝利: 重症度が低く、かつターンオーバーしていない場合のみ
       state = state.copyWith(
           logMessages: ['✅ 判定: 重症度が10%以下となり、治療成功と判定されました。', ...state.logMessages]
+      );
+    } else if (isTurnOver) {
+      // 🚨 膠着敗北: ターン超過した場合は、重症度に関わらず敗北と判定
+      state = state.copyWith(
+          logMessages: ['🚨 判定: 治療が長期化し、許容ターン数 (${MAX_ALLOWED_TURN}T) を超えました。治療失敗と判定されます。', ...state.logMessages]
+      );
+    } else if (state.currentSeverity >= 100.0) {
+      // 🚨 重症度敗北: 重症度が100%に達した場合
+      state = state.copyWith(
+          logMessages: ['🚨 判定: 重症度が100%に達し、治療失敗と判定されました。', ...state.logMessages]
       );
     }
   }
@@ -246,7 +266,7 @@ class GameNotifier extends StateNotifier<GameState> {
   void surrender() {
     if (isGameOver) return;
     
-    // ギブアップを敗北として処理するため、重症度を100%に設定
+    // ギブアップを重症度敗北として処理するため、重症度を100%に設定
     state = state.copyWith(
       currentSeverity: 100.0,
       logMessages: ['⛔️ ギブアップ: プレイヤーが治療を断念しました。治療失敗として評価されます。', ...state.logMessages],

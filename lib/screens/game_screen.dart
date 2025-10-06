@@ -7,31 +7,80 @@ import '../widgets/log_panel.dart';
 import '../widgets/enemy_display.dart'; 
 import 'result_screen.dart';
 
-class GameScreen extends ConsumerWidget {
+// ConsumerStatefulWidgetに変更
+class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final gameState = ref.watch(gameNotifierProvider);
-    
-    // ゲームオーバー判定と画面遷移ロジックを、ビルドサイクルの後に実行するように遅延
-    Future.microtask(() {
-      final notifier = ref.read(gameNotifierProvider.notifier);
-      if (notifier.isGameOver) {
-        
-        // ★修正: 画面遷移の前に、分離したログ記録メソッドを呼び出す
-        notifier.recordEndGameLog();
-        
-        // ResultScreenへ遷移
-        Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const ResultScreen()));
-      }
-    });
+  ConsumerState<GameScreen> createState() => _GameScreenState();
+}
 
-    // isGameOver判定が遅延されたため、ここではローディング画面を表示
-    if (ref.read(gameNotifierProvider.notifier).isGameOver) {
-        return const Scaffold(body: Center(child: Text('治療結果を評価中...')));
+class _GameScreenState extends ConsumerState<GameScreen> {
+  // ゲームオーバー時の遷移を制御するフラグ
+  bool _isNavigationPending = false; 
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // ウィジェットが描画された後に一度だけチェックを予約
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndNavigateIfGameOver();
+    });
+  }
+
+  // 状態が変更されたときにチェックを再予約
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // 状態が変更された直後にも、ビルド後にチェックを予約
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndNavigateIfGameOver();
+    });
+  }
+  
+  // ゲームオーバー判定と遷移のロジック（ビルドサイクル外で実行される）
+  void _checkAndNavigateIfGameOver() {
+    // contextがマウントされていない場合や、既に遷移中の場合は処理しない
+    if (!mounted || _isNavigationPending) return; 
+
+    final notifier = ref.read(gameNotifierProvider.notifier);
+    
+    if (notifier.isGameOver) {
+      // 遷移処理中であることをマーク
+      setState(() {
+          _isNavigationPending = true; 
+      });
+      
+      // ログ記録をここで実行
+      notifier.recordEndGameLog();
+      
+      // ResultScreenへ遷移
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const ResultScreen()),
+      );
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gameState = ref.watch(gameNotifierProvider);
+
+    // 遷移中は、結果評価中の画面を表示してユーザー操作を防ぐ
+    if (_isNavigationPending) {
+      return const Scaffold(body: Center(child: Text('治療結果を評価中...')));
+    }
+
+    // ギブアップボタンの処理
+    final VoidCallback onSurrender = () {
+        // Notifierの状態を変更し、ゲームオーバーを確定
+        ref.read(gameNotifierProvider.notifier).surrender();
+        // 状態変更後に、ビルド後に遷移チェックを確実に行う
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+            _checkAndNavigateIfGameOver();
+        });
+    };
 
     return Scaffold(
       appBar: AppBar(
@@ -41,9 +90,7 @@ class GameScreen extends ConsumerWidget {
           TextButton.icon(
             icon: const Icon(Icons.flag, color: Colors.grey),
             label: const Text('ギブアップ', style: TextStyle(color: Colors.grey, fontSize: 13)),
-            onPressed: () {
-              ref.read(gameNotifierProvider.notifier).surrender();
-            },
+            onPressed: onSurrender,
           ),
         ],
       ),
