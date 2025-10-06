@@ -13,13 +13,21 @@ class GameScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final gameState = ref.watch(gameNotifierProvider);
-    final isGameOver = ref.read(gameNotifierProvider.notifier).isGameOver; 
+    
+    // 状態変更を伴う可能性のあるisGameOverの呼び出しと画面遷移ロジックを、
+    // ビルドサイクルの後に実行されるように遅延させる (Riverpodエラー回避の推奨手法)
+    Future.microtask(() {
+      final notifier = ref.read(gameNotifierProvider.notifier);
+      if (notifier.isGameOver) {
+        // ゲームオーバーが確定したら、ResultScreenへ遷移
+        Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const ResultScreen()));
+      }
+    });
 
-    // ゲームオーバー判定と画面遷移
-    if (isGameOver) {
-      Future.microtask(() => Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const ResultScreen())));
-      return const Scaffold(body: Center(child: Text('治療結果を評価中...')));
+    // ゲームオーバーが確定した場合、遷移が完了するまでの間はローディング画面を表示
+    if (ref.read(gameNotifierProvider.notifier).isGameOver) {
+        return const Scaffold(body: Center(child: Text('治療結果を評価中...')));
     }
 
     return Scaffold(
@@ -27,7 +35,6 @@ class GameScreen extends ConsumerWidget {
         title: Text('治療ターン: ${gameState.currentTurn} - ${gameState.currentCase.name}'),
         automaticallyImplyLeading: false, 
         actions: [
-          // ★ギブアップボタン追加
           TextButton.icon(
             icon: const Icon(Icons.flag, color: Colors.grey),
             label: const Text('ギブアップ', style: TextStyle(color: Colors.grey, fontSize: 13)),
@@ -39,21 +46,12 @@ class GameScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // 画面上部：リスクメーター
           GameDashboard(gameState: gameState),
-          
-          // 中央上部: 敵のイメージ表示 (視覚化)
           EnemyDisplay(gameState: gameState),
-
-          // 中央下部：情報ログ
-          // Expanded(child: LogPanel(logMessages: gameState.logMessages)), // 下で修正
           Expanded(
             child: LogPanel(logMessages: gameState.logMessages),
           ),
-          
-          // 画面下部：アクションバー（投薬選択）
           ActionCards(gameState: gameState),
-          
           const Padding(
             padding: EdgeInsets.all(8.0),
             child: Text('※ 本画面はシミュレーションです。現実の治療判断には使用できません。', style: TextStyle(color: Colors.grey, fontSize: 10)),
