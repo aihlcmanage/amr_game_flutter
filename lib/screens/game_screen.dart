@@ -1,22 +1,36 @@
+// lib/screens/game_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/game_notifier.dart';
-import '../models/enums.dart'; // SupportAction, WeaponCategoryなど
-import '../models/weapon_data.dart'; // WEAPON_DATAなど
-import 'result_screen.dart'; // 結果画面
+import '../state/game_state.dart'; // ★修正: GameStateをインポート
+import '../models/enums.dart'; 
+import '../models/weapon_data.dart'; // WEAPON_DATAを使用するためインポート
+import 'result_screen.dart'; 
+import 'case_selection_screen.dart'; // CaseSelectionScreenのCaseCardを参照するため、ここではインポートが必要
 
 class GameScreen extends ConsumerWidget {
   const GameScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    
     // ----------------------------------------------------
-    // 【重要】ゲームオーバー状態の監視と画面遷移ロジック
+    // ゲームオーバー状態の監視と画面遷移ロジック
     // ----------------------------------------------------
     ref.listen<GameState>(gameNotifierProvider, (previous, next) {
-      // 状態がゲームオーバーに変化した場合に遷移
+      // previousはNotifierのStateであるため、常にGameState型
+      // next.isGameOverがtrueになり、かつprevious.isGameOverがfalseから変わった瞬間を捉える
       if (!previous!.isGameOver && next.isGameOver) {
+        
+        // 🚨 注意: Riverpodのlistenコールバック内での状態変更は、
+        //         ウィジェットツリーの構築中に発生しないよう注意が必要です。
+        //         (Riverpodエラーメッセージ 'Tried to modify a provider while the widget tree was building' はこのため発生しやすい)
+        //         しかし、ここではボタンアクションやターン進行後(状態変更完了後)に遷移しているため、
+        //         問題ないケースが多いですが、もし問題が発生する場合は、Future.microtask等で遅延させます。
+        
         // ゲーム終了時のログを記録（スコアリングのため）
+        // 既に勝利/敗北条件が満たされていれば、recordEndGameLogはログメッセージを追加するだけです。
         ref.read(gameNotifierProvider.notifier).recordEndGameLog();
         
         // 結果画面へ遷移し、ゲーム画面をスタックから削除
@@ -28,7 +42,6 @@ class GameScreen extends ConsumerWidget {
 
     final state = ref.watch(gameNotifierProvider);
 
-    // ダミーのGameScreen UI (実際のゲーム要素はここに配置)
     return Scaffold(
       appBar: AppBar(
         title: Text('治療ターン: ${state.currentTurn} - ${state.currentCase.name}'),
@@ -47,7 +60,7 @@ class GameScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ステータス表示エリア
+            // ステータス表示エリア (画像に見られるUI要素)
             _buildStatusDisplay(state),
             const SizedBox(height: 20),
             
@@ -131,9 +144,10 @@ class GameScreen extends ConsumerWidget {
         Row(
           children: [
             ElevatedButton(
-              onPressed: state.turnsUntilDiagnosis <= 0 ? null : () {
+              // 診断が完了していない場合のみ「精密検査」ボタンを有効にする（0より大きい時）
+              onPressed: state.turnsUntilDiagnosis > 0 ? () {
                 ref.read(gameNotifierProvider.notifier).performSupportAction(SupportAction.Inspection);
-              },
+              } : null,
               child: const Text('精密検査'),
             ),
             const SizedBox(width: 10),
@@ -163,7 +177,7 @@ class GameScreen extends ConsumerWidget {
             borderRadius: BorderRadius.circular(8.0),
           ),
           child: ListView.builder(
-            reverse: true, // 最新のログが下に来るようにする
+            reverse: true, 
             itemCount: state.logMessages.length,
             itemBuilder: (context, index) {
               return Padding(
