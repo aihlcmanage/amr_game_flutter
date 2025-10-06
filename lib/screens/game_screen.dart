@@ -7,7 +7,7 @@ import '../widgets/log_panel.dart';
 import '../widgets/enemy_display.dart'; 
 import 'result_screen.dart';
 
-// ConsumerStatefulWidgetに変更
+// ConsumerStatefulWidgetを維持
 class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
 
@@ -16,53 +16,55 @@ class GameScreen extends ConsumerStatefulWidget {
 }
 
 class _GameScreenState extends ConsumerState<GameScreen> {
-  // ゲームオーバー時の遷移を制御するフラグ
+  // State側では遷移制御フラグのみを保持
   bool _isNavigationPending = false; 
 
   @override
   void initState() {
     super.initState();
     
-    // ウィジェットが描画された後に一度だけチェックを予約
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAndNavigateIfGameOver();
-    });
+    // initState内でref.listenを使って状態変化を監視し、遷移処理を確実に行う
+    // ★ 状態変化を監視するメインのロジックをここに移動
+    final notifier = ref.read(gameNotifierProvider.notifier);
+
+    // isGameOverの状態だけを監視
+    ref.listen<bool>(
+      // notifierのisGameOverゲッターの状態を監視
+      gameNotifierProvider.select((state) => notifier.isGameOver),
+      (previous, nextIsGameOver) {
+        // nextIsGameOverがtrueになり、かつ遷移処理中でない場合に処理を実行
+        if (nextIsGameOver && !_isNavigationPending) {
+          
+          // 遷移処理中であることをマーク
+          // このsetStateはlistenコールバック内で安全に呼び出せる
+          setState(() {
+            _isNavigationPending = true; 
+          });
+
+          // ログ記録をここで実行
+          notifier.recordEndGameLog();
+          
+          // ResultScreenへ遷移し、ゲーム画面をスタックから削除
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const ResultScreen()),
+          );
+        }
+      },
+    );
   }
 
-  // 状態が変更されたときにチェックを再予約
+  // didChangeDependenciesと_checkAndNavigateIfGameOverは不要になるため削除（今回は残してあります）
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
-    // didChangeDependenciesは頻繁に呼び出されるため、setState内のロジックはここではなく
-    // build後に予約したコールバック内で実行するのが安全
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkAndNavigateIfGameOver();
-    });
+    // 依存関係の変更時に特に遷移の再チェックは不要
   }
   
-  // ゲームオーバー判定と遷移のロジック（ビルドサイクル外で実行される）
+  // _checkAndNavigateIfGameOverはref.listenに置き換わるため、ここでは残しますが、
+  // 実際にはinitState内のref.listenが主な役割を果たします。
   void _checkAndNavigateIfGameOver() {
-    // contextがマウントされていない場合や、既に遷移中の場合は処理しない
-    if (!mounted || _isNavigationPending) return; 
-
-    // Notifierを参照し、状態を取得
-    final notifier = ref.read(gameNotifierProvider.notifier);
-    
-    if (notifier.isGameOver) {
-      // 遷移処理中であることをマーク
-      setState(() {
-          _isNavigationPending = true; 
-      });
-      
-      // ログ記録をここで実行
-      notifier.recordEndGameLog();
-      
-      // ResultScreenへ遷移
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const ResultScreen()),
-      );
-    }
+    // 監視ロジックがinitState内のref.listenに移ったため、このメソッドは事実上不要になりました。
+    // 互換性のため残しますが、空にしておきます。
   }
 
   @override
@@ -74,15 +76,19 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     if (_isNavigationPending) {
       return const Scaffold(body: Center(child: Text('治療結果を評価中...')));
     }
+    
+    // ゲームオーバー状態でもActionCardsが表示されないようにチェックを追加 (ActionCards内部にも必要ですが、保険として)
+    if (ref.read(gameNotifierProvider.notifier).isGameOver) {
+      // isNavigationPendingがtrueになるまでのわずかな時間、画面フリーズを防ぐためにローディング表示
+      return const Scaffold(body: Center(child: Text('治療結果を評価中...')));
+    }
 
     // ギブアップボタンの処理
     final VoidCallback onSurrender = () {
         // Notifierの状態を変更し、ゲームオーバーを確定
         ref.read(gameNotifierProvider.notifier).surrender();
-        // 状態変更後に、ビルド後に遷移チェックを確実に行う
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-            _checkAndNavigateIfGameOver();
-        });
+        // ★ ギブアップ後、initStateのref.listenが即座にこれを検出して遷移処理を行う
+        // ここでの addPostFrameCallback は不要になります
     };
 
     return Scaffold(
@@ -93,7 +99,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           TextButton.icon(
             icon: const Icon(Icons.flag, color: Colors.grey),
             label: const Text('ギブアップ', style: TextStyle(color: Colors.grey, fontSize: 13)),
-            onPressed: onSurrender,
+            // 既にゲームオーバーの場合はボタンを無効化
+            onPressed: ref.read(gameNotifierProvider.notifier).isGameOver ? null : onSurrender, 
           ),
         ],
       ),
