@@ -72,9 +72,9 @@ class GameScreen extends ConsumerWidget {
             // アクションボタンエリア
             // Notifierのゲッターを直接呼び出し
             if (!notifier.isGameOver) ...[ 
-              _buildWeaponActions(ref),
+              _buildWeaponActions(ref), // 兵器選択ボタン (横スクロール)
               const SizedBox(height: 20),
-              _buildSupportActions(ref, state),
+              _buildSupportActions(ref, state), // サポートボタン (並列配置)
             ] else ...[
               const Center(
                 child: Padding(
@@ -115,17 +115,11 @@ class GameScreen extends ConsumerWidget {
     );
   }
 
-  // ★修正: 攻撃（投薬）ボタンをカテゴリごとにグループ化
+  // ★修正: 兵器選択ボタンを横スクロールに戻す
   Widget _buildWeaponActions(WidgetRef ref) {
-    // WeaponCategoryとAntibioticWeapon型が正しく解決されるように型指定
-    final Map<WeaponCategory, List<AntibioticWeapon>> categorizedWeapons = { 
-      for (var category in WeaponCategory.values) category: <AntibioticWeapon>[] 
-    };
     
-    // WEAPON_DATAの要素をAntibioticWeapon型にキャストして使用
-    for (var weapon in WEAPON_DATA.cast<AntibioticWeapon>()) {
-        categorizedWeapons[weapon.category]?.add(weapon);
-    }
+    // WEAPON_DATAをAntibioticWeapon型として取得
+    final weapons = WEAPON_DATA.cast<AntibioticWeapon>();
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,49 +127,36 @@ class GameScreen extends ConsumerWidget {
         const Text('⚔️ 投薬アクション (兵器選択)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         
-        // カテゴリごとにボタンを表示
-        ...categorizedWeapons.keys.map((category) {
-          final weapons = categorizedWeapons[category]!;
-          if (weapons.isEmpty) return const SizedBox.shrink();
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // カテゴリ名
-                Text(
-                  _getCategoryName(category), 
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.blueGrey),
+        // 横スクロール可能なListViewでボタンを並べる
+        SizedBox(
+          height: 50, // ボタンの高さに応じて調整
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            spacing: 8.0,
+            children: weapons.map((weapon) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0), // ボタン間のスペース
+                child: ElevatedButton(
+                  onPressed: () {
+                    ref.read(gameNotifierProvider.notifier).applyTreatment(weapon); 
+                  },
+                  // カテゴリの色付けは保持する
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _getCategoryColor(weapon.category), 
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16), // 横幅を節約
+                  ),
+                  child: Text(weapon.name, style: const TextStyle(fontSize: 14)), 
                 ),
-                const SizedBox(height: 8),
-                // 武器ボタン
-                Wrap(
-                  spacing: 8.0,
-                  runSpacing: 8.0,
-                  children: weapons.map((weapon) {
-                    return ElevatedButton(
-                      onPressed: () {
-                        // AntibioticWeapon型として適用
-                        ref.read(gameNotifierProvider.notifier).applyTreatment(weapon); 
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _getCategoryColor(category), 
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      // AntibioticWeaponにはnameプロパティがあることを確認済み
-                      child: Text(weapon.name), 
-                    );
-                  }).toList().cast<Widget>(), // List<Widget>にキャスト
-                ),
-              ],
-            ),
-          );
-        }).toList(),
+              );
+            }).toList(),
+          ),
+        ),
       ],
     );
   }
+
 
   // カテゴリ名を日本語で返すヘルパー関数
   String _getCategoryName(WeaponCategory category) {
