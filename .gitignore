@@ -1,4 +1,4 @@
-# Miscellaneous
+Miscellaneous
 *.class
 *.log
 *.pyc
@@ -12,34 +12,42 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+IntelliJ related
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+The .vscode folder contains launch configuration and tasks you configure in
+VS Code which you may wish to be included in version control, so this line
+is commented out by default.
 #.vscode/
 
-# Flutter/Dart/Pub related
+Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
+
+★★★ 修正箇所 ★★★
+build/フォルダ全体を無視する行をコメントアウト:
 /build/
+ただし、/build/web 以下のファイルは追跡する例外ルールを追加:
+!/build/web
+/build/*
+!/build/web/*
+
 /coverage/
 
-# Symbolication related
+Symbolication related
 app.*.symbols
 
-# Obfuscation related
+Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
 /android/app/release
