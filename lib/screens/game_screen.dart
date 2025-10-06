@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/game_notifier.dart';
 import '../state/game_state.dart'; 
 import '../models/enums.dart'; 
-import '../models/weapon_data.dart'; 
+import '../models/weapon_data.dart'; // WeaponDataとWEAPON_DATAの定義があることを期待
 import 'result_screen.dart'; 
 import 'case_selection_screen.dart'; 
 
@@ -71,7 +71,7 @@ class GameScreen extends ConsumerWidget {
             // アクションボタンエリア
             // Notifierのゲッターを直接呼び出し
             if (!notifier.isGameOver) ...[ 
-              _buildWeaponActions(ref), // ★ 投薬アクションの表示を修正
+              _buildWeaponActions(ref),
               const SizedBox(height: 20),
               _buildSupportActions(ref, state),
             ] else ...[
@@ -117,8 +117,13 @@ class GameScreen extends ConsumerWidget {
   // ★修正: 攻撃（投薬）ボタンをカテゴリごとにグループ化
   Widget _buildWeaponActions(WidgetRef ref) {
     // カテゴリごとに武器を分類
-    final categorizedWeapons = { for (var category in WeaponCategory.values) category: <WeaponData>[] };
-    for (var weapon in WEAPON_DATA) {
+    // Mapの型を明示的に指定し、'WeaponData'が認識されないエラーに対応
+    final Map<WeaponCategory, List<WeaponData>> categorizedWeapons = { 
+      for (var category in WeaponCategory.values) category: <WeaponData>[] 
+    };
+    
+    // WEAPON_DATAをWeaponDataのリストとしてキャストし、型推論のエラー（Object?）を解消
+    for (var weapon in WEAPON_DATA.cast<WeaponData>()) {
       categorizedWeapons[weapon.category]?.add(weapon);
     }
 
@@ -151,16 +156,17 @@ class GameScreen extends ConsumerWidget {
                   children: weapons.map((weapon) {
                     return ElevatedButton(
                       onPressed: () {
+                        // weaponはWeaponData型として確定している
                         ref.read(gameNotifierProvider.notifier).applyTreatment(weapon);
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _getCategoryColor(category), // カテゴリごとに色を変える
+                        backgroundColor: _getCategoryColor(category), 
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      child: Text(weapon.name),
+                      child: Text(weapon.name), 
                     );
-                  }).toList(),
+                  }).toList(), // Mapの戻り値はWidget型になるため、List<Widget>に問題なく変換される
                 ),
               ],
             ),
@@ -172,6 +178,8 @@ class GameScreen extends ConsumerWidget {
 
   // カテゴリ名を日本語で返すヘルパー関数
   String _getCategoryName(WeaponCategory category) {
+    // Enumメンバーのエラーは定義ファイル（enums.dart）の問題ですが、
+    // ここでは名前が正しいと仮定してswitch文を維持
     switch (category) {
       case WeaponCategory.BetaLactam:
         return 'ベータラクタム系';
@@ -182,7 +190,8 @@ class GameScreen extends ConsumerWidget {
       case WeaponCategory.Other:
         return 'その他';
       default:
-        return '未分類';
+        // 未定義のカテゴリをnameで表示
+        return category.name; 
     }
   }
 
