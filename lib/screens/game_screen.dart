@@ -6,6 +6,7 @@ import '../models/enums.dart';
 import '../models/weapon_data.dart'; // WeaponDataとWEAPON_DATAの定義があることを期待
 import 'result_screen.dart'; 
 import 'case_selection_screen.dart'; 
+import '../models/models.dart'; // AntibioticWeaponの型解決のため追加
 
 class GameScreen extends ConsumerWidget {
   const GameScreen({super.key});
@@ -116,15 +117,14 @@ class GameScreen extends ConsumerWidget {
 
   // ★修正: 攻撃（投薬）ボタンをカテゴリごとにグループ化
   Widget _buildWeaponActions(WidgetRef ref) {
-    // 型エラーを回避するため、一時的にdynamicを使用
-    final Map<WeaponCategory, List<dynamic>> finalWeapons = { 
-      for (var category in WeaponCategory.values) category: <dynamic>[] 
+    // WeaponCategoryとAntibioticWeapon型が正しく解決されるように型指定
+    final Map<WeaponCategory, List<AntibioticWeapon>> categorizedWeapons = { 
+      for (var category in WeaponCategory.values) category: <AntibioticWeapon>[] 
     };
     
-    // WEAPON_DATAの要素をdynamicとして受け取り、categoryプロパティを持つことを期待
-    for (var weapon in WEAPON_DATA) {
-        // weapon.categoryでアクセスできることを前提
-        finalWeapons[weapon.category]?.add(weapon);
+    // WEAPON_DATAの要素をAntibioticWeapon型にキャストして使用
+    for (var weapon in WEAPON_DATA.cast<AntibioticWeapon>()) {
+        categorizedWeapons[weapon.category]?.add(weapon);
     }
     
     return Column(
@@ -134,8 +134,8 @@ class GameScreen extends ConsumerWidget {
         const SizedBox(height: 12),
         
         // カテゴリごとにボタンを表示
-        ...finalWeapons.keys.map((category) {
-          final weapons = finalWeapons[category]!;
+        ...categorizedWeapons.keys.map((category) {
+          final weapons = categorizedWeapons[category]!;
           if (weapons.isEmpty) return const SizedBox.shrink();
 
           return Padding(
@@ -156,8 +156,7 @@ class GameScreen extends ConsumerWidget {
                   children: weapons.map((weapon) {
                     return ElevatedButton(
                       onPressed: () {
-                        // weaponがapplyTreatmentの引数型（AntibioticWeapon）であることを前提として渡す
-                        // dynamicを渡し、Notifier側で受け入れられることを期待
+                        // AntibioticWeapon型として適用
                         ref.read(gameNotifierProvider.notifier).applyTreatment(weapon); 
                       },
                       style: ElevatedButton.styleFrom(
@@ -165,10 +164,10 @@ class GameScreen extends ConsumerWidget {
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      // nameプロパティへのアクセスはdynamicでも可能だが、実行時エラー回避のためStringにキャスト
-                      child: Text(weapon.name as String), 
+                      // AntibioticWeaponにはnameプロパティがあることを確認済み
+                      child: Text(weapon.name), 
                     );
-                  }).toList().cast<Widget>(), // List<dynamic>をList<Widget>に明示的にキャスト
+                  }).toList().cast<Widget>(), // List<Widget>にキャスト
                 ),
               ],
             ),
@@ -180,16 +179,14 @@ class GameScreen extends ConsumerWidget {
 
   // カテゴリ名を日本語で返すヘルパー関数
   String _getCategoryName(WeaponCategory category) {
-    // Enumメンバーのアクセスエラーに対応するため、メンバー名をSnakeCaseに修正
+    // lib/models/enums.dartで定義されている Access, Watch, Reserve に修正
     switch (category) {
-      case WeaponCategory.beta_lactam: // ★ 再々修正: SnakeCase
-        return 'ベータラクタム系';
-      case WeaponCategory.fluoroquinolone: // ★ 再々修正: SnakeCase
-        return 'フルオロキノロン系';
-      case WeaponCategory.glycopeptide: // ★ 再々修正: SnakeCase
-        return 'グリコペプチド系';
-      case WeaponCategory.other: // ★ 再々修正: SnakeCase
-        return 'その他';
+      case WeaponCategory.Access: 
+        return 'Access (初動/軽装)';
+      case WeaponCategory.Watch: 
+        return 'Watch (監視/中等度)';
+      case WeaponCategory.Reserve: 
+        return 'Reserve (最終/重篤)';
       default:
         // 未定義のカテゴリをnameで表示
         return category.name; 
@@ -198,16 +195,14 @@ class GameScreen extends ConsumerWidget {
 
   // カテゴリごとに色を返すヘルパー関数
   Color _getCategoryColor(WeaponCategory category) {
-    // Enumメンバーのアクセスエラーに対応するため、メンバー名をSnakeCaseに修正
+    // lib/models/enums.dartで定義されている Access, Watch, Reserve に修正
     switch (category) {
-      case WeaponCategory.beta_lactam: // ★ 再々修正: SnakeCase
+      case WeaponCategory.Access: 
         return Colors.green.shade600;
-      case WeaponCategory.fluoroquinolone: // ★ 再々修正: SnakeCase
+      case WeaponCategory.Watch: 
         return Colors.blue.shade600;
-      case WeaponCategory.glycopeptide: // ★ 再々修正: SnakeCase
-        return Colors.purple.shade600;
-      case WeaponCategory.other: // ★ 再々修正: SnakeCase
-        return Colors.orange.shade600;
+      case WeaponCategory.Reserve: 
+        return Colors.red.shade600; // Reserveは危険度が高いので赤系に
       default:
         return Colors.grey;
     }
