@@ -2,56 +2,62 @@ import 'package:flutter/material.dart';
 
 class LogPanel extends StatelessWidget {
   final List<String> logMessages;
-
   const LogPanel({required this.logMessages, super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('ターンログ:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const Divider(),
-          Expanded(
-            child: ListView.builder(
-              // ログを最新のものから表示するため逆順に
-              reverse: true,
-              itemCount: logMessages.length,
-              itemBuilder: (context, index) {
-                // インデックスを逆転させて最新のログが下に来るようにする
-                final reversedIndex = logMessages.length - 1 - index;
-                final message = logMessages[reversedIndex];
-                
-                // 教育的な警告や成功メッセージを色分け
-                Color color = Colors.black87;
-                if (message.contains('成功')) {
-                  color = Colors.green.shade700;
-                } else if (message.contains('警告') || message.contains('ペナルティ')) {
-                  color = Colors.orange.shade700;
-                } else if (message.contains('超過')) {
-                  color = Colors.red.shade700;
-                }
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: Text(
-                    message,
-                    style: TextStyle(fontSize: 13, color: color),
-                  ),
-                );
-              },
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: ListView.builder(
+        reverse: true, // 新しいログが下に来るように反転
+        itemCount: logMessages.length,
+        itemBuilder: (context, index) {
+          final message = logMessages[index];
+          // ログメッセージの背景色: 最新のログを目立たせる
+          final bool isNew = index < 3; 
+          
+          return Container(
+            margin: const EdgeInsets.only(bottom: 6.0),
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: isNew ? Colors.blue.shade50 : Colors.transparent, // 最新ログは薄い青
+              borderRadius: BorderRadius.circular(4),
+              border: index == 0 ? Border.all(color: Colors.blue.shade200) : null, // 最上部を強調
             ),
-          ),
-        ],
+            child: Text(
+              _formatLogMessage(message),
+              style: TextStyle(
+                fontSize: 13, // 文字サイズを拡大
+                color: _getLogColor(message),
+                fontWeight: _isImportant(message) ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          );
+        },
       ),
     );
+  }
+  
+  // ログメッセージのプレフィックスに応じて色を決定
+  Color _getLogColor(String message) {
+    if (message.startsWith('🚨')) return Colors.red.shade700;
+    if (message.startsWith('✅')) return Colors.green.shade700;
+    if (message.startsWith('💡')) return Colors.blue.shade700;
+    if (message.startsWith('⚠️')) return Colors.orange.shade700;
+    return Colors.black87;
+  }
+
+  // ログメッセージの内容に応じて太字を適用するか判断
+  bool _isImportant(String message) {
+    return message.startsWith('🚨') || message.startsWith('✅') || message.contains('ステップダウン');
+  }
+
+  // ログメッセージの絵文字置換とフォーマット
+  String _formatLogMessage(String message) {
+    return message
+        .replaceAll('治療実施', '💉 治療')
+        .replaceAll('警告: 耐性リスク', '⚠️ リスク')
+        .replaceAll('副作用コスト', '💊 コスト')
+        .replaceAll('💡 思考', '🧠 助言');
   }
 }
