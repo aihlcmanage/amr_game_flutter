@@ -1,13 +1,11 @@
-// lib/screens/game_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/game_notifier.dart';
-import '../state/game_state.dart'; // ★修正: GameStateをインポート
+import '../state/game_state.dart'; 
 import '../models/enums.dart'; 
-import '../models/weapon_data.dart'; // WEAPON_DATAを使用するためインポート
+import '../models/weapon_data.dart'; 
 import 'result_screen.dart'; 
-import 'case_selection_screen.dart'; // CaseSelectionScreenのCaseCardを参照するため、ここではインポートが必要
+import 'case_selection_screen.dart'; 
 
 class GameScreen extends ConsumerWidget {
   const GameScreen({super.key});
@@ -15,32 +13,33 @@ class GameScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     
-    // ----------------------------------------------------
-    // ゲームオーバー状態の監視と画面遷移ロジック
-    // ----------------------------------------------------
-    ref.listen<GameState>(gameNotifierProvider, (previous, next) {
-      // previousはNotifierのStateであるため、常にGameState型
-      // next.isGameOverがtrueになり、かつprevious.isGameOverがfalseから変わった瞬間を捉える
-      if (!previous!.isGameOver && next.isGameOver) {
-        
-        // 🚨 注意: Riverpodのlistenコールバック内での状態変更は、
-        //         ウィジェットツリーの構築中に発生しないよう注意が必要です。
-        //         (Riverpodエラーメッセージ 'Tried to modify a provider while the widget tree was building' はこのため発生しやすい)
-        //         しかし、ここではボタンアクションやターン進行後(状態変更完了後)に遷移しているため、
-        //         問題ないケースが多いですが、もし問題が発生する場合は、Future.microtask等で遅延させます。
-        
-        // ゲーム終了時のログを記録（スコアリングのため）
-        // 既に勝利/敗北条件が満たされていれば、recordEndGameLogはログメッセージを追加するだけです。
-        ref.read(gameNotifierProvider.notifier).recordEndGameLog();
-        
-        // 結果画面へ遷移し、ゲーム画面をスタックから削除
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const ResultScreen()),
-        );
-      }
-    });
-
+    // GameState全体を監視
     final state = ref.watch(gameNotifierProvider);
+
+    // ----------------------------------------------------
+    // 【重要】isGameOver状態の監視と画面遷移ロジック
+    // ----------------------------------------------------
+    // Notifierのインスタンスを取得
+    final notifier = ref.read(gameNotifierProvider.notifier);
+
+    // isGameOverの状態だけを監視
+    ref.listen<bool>(
+      gameNotifierProvider.select((state) => notifier.isGameOver), // Notifierのゲッターを参照
+      (previous, nextIsGameOver) {
+        // nextIsGameOverがtrueになり、かつpreviousがfalseから変わった瞬間を捉える
+        if (nextIsGameOver && !previous!) {
+          
+          // ゲーム終了時のログを記録
+          notifier.recordEndGameLog();
+          
+          // 結果画面へ遷移し、ゲーム画面をスタックから削除
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const ResultScreen()),
+          );
+        }
+      },
+    );
+
 
     return Scaffold(
       appBar: AppBar(
@@ -49,8 +48,9 @@ class GameScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.flag),
             tooltip: 'ギブアップ',
-            onPressed: state.isGameOver ? null : () {
-              ref.read(gameNotifierProvider.notifier).surrender();
+            // Notifierのゲッターを直接呼び出し
+            onPressed: notifier.isGameOver ? null : () { 
+              notifier.surrender();
             },
           ),
         ],
@@ -60,7 +60,7 @@ class GameScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ステータス表示エリア (画像に見られるUI要素)
+            // ステータス表示エリア
             _buildStatusDisplay(state),
             const SizedBox(height: 20),
             
@@ -69,7 +69,8 @@ class GameScreen extends ConsumerWidget {
             const SizedBox(height: 20),
             
             // アクションボタンエリア
-            if (!state.isGameOver) ...[
+            // Notifierのゲッターを直接呼び出し
+            if (!notifier.isGameOver) ...[ 
               _buildWeaponActions(ref),
               const SizedBox(height: 20),
               _buildSupportActions(ref, state),
@@ -144,7 +145,7 @@ class GameScreen extends ConsumerWidget {
         Row(
           children: [
             ElevatedButton(
-              // 診断が完了していない場合のみ「精密検査」ボタンを有効にする（0より大きい時）
+              // 診断が完了していない場合のみ「精密検査」ボタンを有効にする
               onPressed: state.turnsUntilDiagnosis > 0 ? () {
                 ref.read(gameNotifierProvider.notifier).performSupportAction(SupportAction.Inspection);
               } : null,
