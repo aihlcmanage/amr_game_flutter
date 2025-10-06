@@ -1,248 +1,118 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/game_notifier.dart';
-import '../state/game_state.dart'; 
-import '../models/enums.dart'; 
-import '../models/weapon_data.dart'; // WeaponDataとWEAPON_DATAの定義があることを期待
-import 'result_screen.dart'; 
-import 'case_selection_screen.dart'; 
-import '../models/models.dart'; // AntibioticWeaponの型解決のため追加
+import '../widgets/game_dashboard.dart'; 
+import '../widgets/action_cards.dart'; 
+import '../widgets/log_panel.dart'; 
+import '../widgets/enemy_display.dart'; 
+import 'result_screen.dart';
 
-class GameScreen extends ConsumerWidget {
+// ConsumerStatefulWidgetに変更
+class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GameScreen> createState() => _GameScreenState();
+}
+
+class _GameScreenState extends ConsumerState<GameScreen> {
+  // ゲームオーバー時の遷移を制御するフラグ
+  bool _isNavigationPending = false; 
+
+  @override
+  void initState() {
+    super.initState();
     
-    // GameState全体を監視
-    final state = ref.watch(gameNotifierProvider);
+    // ウィジェットが描画された後に一度だけチェックを予約
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndNavigateIfGameOver();
+    });
+  }
 
-    // ----------------------------------------------------
-    // 【重要】isGameOver状態の監視と画面遷移ロジック
-    // ----------------------------------------------------
-    // Notifierのインスタンスを取得
+  // 状態が変更されたときにチェックを再予約
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // didChangeDependenciesは頻繁に呼び出されるため、setState内のロジックはここではなく
+    // build後に予約したコールバック内で実行するのが安全
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndNavigateIfGameOver();
+    });
+  }
+  
+  // ゲームオーバー判定と遷移のロジック（ビルドサイクル外で実行される）
+  void _checkAndNavigateIfGameOver() {
+    // contextがマウントされていない場合や、既に遷移中の場合は処理しない
+    if (!mounted || _isNavigationPending) return; 
+
+    // Notifierを参照し、状態を取得
     final notifier = ref.read(gameNotifierProvider.notifier);
+    
+    if (notifier.isGameOver) {
+      // 遷移処理中であることをマーク
+      setState(() {
+          _isNavigationPending = true; 
+      });
+      
+      // ログ記録をここで実行
+      notifier.recordEndGameLog();
+      
+      // ResultScreenへ遷移
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const ResultScreen()),
+      );
+    }
+  }
 
-    // isGameOverの状態だけを監視
-    ref.listen<bool>(
-      gameNotifierProvider.select((state) => notifier.isGameOver), // Notifierのゲッターを参照
-      (previous, nextIsGameOver) {
-        // nextIsGameOverがtrueになり、かつpreviousがfalseから変わった瞬間を捉える
-        if (nextIsGameOver && !previous!) {
-          
-          // ゲーム終了時のログを記録
-          notifier.recordEndGameLog();
-          
-          // 結果画面へ遷移し、ゲーム画面をスタックから削除
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const ResultScreen()),
-          );
-        }
-      },
-    );
+  @override
+  Widget build(BuildContext context) {
+    // 状態の監視
+    final gameState = ref.watch(gameNotifierProvider);
+    
+    // 遷移中は、結果評価中の画面を表示してユーザー操作を防ぐ
+    if (_isNavigationPending) {
+      return const Scaffold(body: Center(child: Text('治療結果を評価中...')));
+    }
 
+    // ギブアップボタンの処理
+    final VoidCallback onSurrender = () {
+        // Notifierの状態を変更し、ゲームオーバーを確定
+        ref.read(gameNotifierProvider.notifier).surrender();
+        // 状態変更後に、ビルド後に遷移チェックを確実に行う
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+            _checkAndNavigateIfGameOver();
+        });
+    };
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('治療ターン: ${state.currentTurn} - ${state.currentCase.name}'),
+        title: Text('治療ターン: ${gameState.currentTurn} - ${gameState.currentCase.name}'),
+        automaticallyImplyLeading: false, 
         actions: [
-          IconButton(
-            icon: const Icon(Icons.flag),
-            tooltip: 'ギブアップ',
-            // Notifierのゲッターを直接呼び出し
-            onPressed: notifier.isGameOver ? null : () { 
-              notifier.surrender();
-            },
+          TextButton.icon(
+            icon: const Icon(Icons.flag, color: Colors.grey),
+            label: const Text('ギブアップ', style: TextStyle(color: Colors.grey, fontSize: 13)),
+            onPressed: onSurrender,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ステータス表示エリア
-            _buildStatusDisplay(state),
-            const SizedBox(height: 20),
-            
-            // ログエリア
-            _buildLogArea(state),
-            const SizedBox(height: 20),
-            
-            // アクションボタンエリア
-            // Notifierのゲッターを直接呼び出し
-            if (!notifier.isGameOver) ...[ 
-              _buildWeaponActions(ref), // 兵器選択ボタン (横スクロール)
-              const SizedBox(height: 20),
-              _buildSupportActions(ref, state), // サポートボタン (並列配置)
-            ] else ...[
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24.0),
-                  child: Text(
-                    'ゲーム終了！結果は自動的に評価されます。',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+      body: Column(
+        children: [
+          // 外部ウィジェットを使用 (これらのウィジェットが定義されている必要があります)
+          GameDashboard(gameState: gameState),
+          EnemyDisplay(gameState: gameState),
+          Expanded(
+            child: LogPanel(logMessages: gameState.logMessages),
+          ),
+          // ActionCardsはゲームオーバー時に非表示にするロジックを内部に持つ必要がある
+          ActionCards(gameState: gameState), 
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text('※ 本画面はシミュレーションです。現実の治療判断には使用できません。', style: TextStyle(color: Colors.grey, fontSize: 10)),
+          ),
+        ],
       ),
-    );
-  }
-
-  // --- UI Helper Functions ---
-
-  Widget _buildStatusDisplay(GameState state) {
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('症例: ${state.currentCase.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text('標的菌: ${state.currentEnemy.name}', style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 10),
-            Text('重症度: ${state.currentSeverity.toStringAsFixed(0)}% (目標 10%以下)'),
-            Text('耐性リスク: ${state.currentResistanceRisk.toStringAsFixed(1)}'),
-            Text('副作用コスト: ${state.currentSideEffectCost.toStringAsFixed(1)}'),
-            Text('診断まで残り: ${state.turnsUntilDiagnosis}T', style: TextStyle(color: state.turnsUntilDiagnosis > 0 ? Colors.red : Colors.green)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ★修正: 兵器選択ボタンを横スクロールに戻す
-  Widget _buildWeaponActions(WidgetRef ref) {
-    
-    // WEAPON_DATAをAntibioticWeapon型として取得
-    final weapons = WEAPON_DATA.cast<AntibioticWeapon>();
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('⚔️ 投薬アクション (兵器選択)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        
-        // 横スクロール可能なListViewでボタンを並べる
-        SizedBox(
-          height: 50, // ボタンの高さに応じて調整
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            // ❌ 存在しないspacingパラメーターを削除
-            children: weapons.map((weapon) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 8.0), // ボタン間のスペース
-                child: ElevatedButton(
-                  onPressed: () {
-                    ref.read(gameNotifierProvider.notifier).applyTreatment(weapon); 
-                  },
-                  // カテゴリの色付けは保持する
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _getCategoryColor(weapon.category), 
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16), // 横幅を節約
-                  ),
-                  child: Text(weapon.name, style: const TextStyle(fontSize: 14)), 
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-
-
-  // カテゴリ名を日本語で返すヘルパー関数
-  String _getCategoryName(WeaponCategory category) {
-    // lib/models/enums.dartで定義されている Access, Watch, Reserve に修正
-    switch (category) {
-      case WeaponCategory.Access: 
-        return 'Access (初動/軽装)';
-      case WeaponCategory.Watch: 
-        return 'Watch (監視/中等度)';
-      case WeaponCategory.Reserve: 
-        return 'Reserve (最終/重篤)';
-      default:
-        // 未定義のカテゴリをnameで表示
-        return category.name; 
-    }
-  }
-
-  // カテゴリごとに色を返すヘルパー関数
-  Color _getCategoryColor(WeaponCategory category) {
-    // lib/models/enums.dartで定義されている Access, Watch, Reserve に修正
-    switch (category) {
-      case WeaponCategory.Access: 
-        return Colors.green.shade600;
-      case WeaponCategory.Watch: 
-        return Colors.blue.shade600;
-      case WeaponCategory.Reserve: 
-        return Colors.red.shade600; // Reserveは危険度が高いので赤系に
-      default:
-        return Colors.grey;
-    }
-  }
-
-
-  Widget _buildSupportActions(WidgetRef ref, GameState state) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('🛠️ サポートアクション', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            ElevatedButton(
-              // 診断が完了していない場合のみ「精密検査」ボタンを有効にする
-              onPressed: state.turnsUntilDiagnosis > 0 ? () {
-                ref.read(gameNotifierProvider.notifier).performSupportAction(SupportAction.Inspection);
-              } : null,
-              child: const Text('精密検査'),
-            ),
-            const SizedBox(width: 10),
-            ElevatedButton(
-              onPressed: () {
-                ref.read(gameNotifierProvider.notifier).performSupportAction(SupportAction.SourceControl);
-              },
-              child: const Text('感染源制御'),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLogArea(GameState state) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('📋 治療ログ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Container(
-          height: 200,
-          padding: const EdgeInsets.all(8.0),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          child: ListView.builder(
-            reverse: true, 
-            itemCount: state.logMessages.length,
-            itemBuilder: (context, index) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2.0),
-                child: Text(state.logMessages[index], style: const TextStyle(fontSize: 12)),
-              );
-            },
-          ),
-        ),
-      ],
     );
   }
 }
