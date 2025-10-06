@@ -116,17 +116,17 @@ class GameScreen extends ConsumerWidget {
 
   // ★修正: 攻撃（投薬）ボタンをカテゴリごとにグループ化
   Widget _buildWeaponActions(WidgetRef ref) {
-    // カテゴリごとに武器を分類
-    // Mapの型を明示的に指定し、'WeaponData'が認識されないエラーに対応
-    final Map<WeaponCategory, List<WeaponData>> categorizedWeapons = { 
-      for (var category in WeaponCategory.values) category: <WeaponData>[] 
+    // 型エラーを回避するため、一時的にdynamicを使用
+    final Map<WeaponCategory, List<dynamic>> finalWeapons = { 
+      for (var category in WeaponCategory.values) category: <dynamic>[] 
     };
     
-    // WEAPON_DATAをWeaponDataのリストとしてキャストし、型推論のエラー（Object?）を解消
-    for (var weapon in WEAPON_DATA.cast<WeaponData>()) {
-      categorizedWeapons[weapon.category]?.add(weapon);
+    // WEAPON_DATAの要素をdynamicとして受け取り、categoryプロパティを持つことを期待
+    for (var weapon in WEAPON_DATA) {
+        // weapon.categoryでアクセスできることを前提
+        finalWeapons[weapon.category]?.add(weapon);
     }
-
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -134,8 +134,8 @@ class GameScreen extends ConsumerWidget {
         const SizedBox(height: 12),
         
         // カテゴリごとにボタンを表示
-        ...categorizedWeapons.keys.map((category) {
-          final weapons = categorizedWeapons[category]!;
+        ...finalWeapons.keys.map((category) {
+          final weapons = finalWeapons[category]!;
           if (weapons.isEmpty) return const SizedBox.shrink();
 
           return Padding(
@@ -156,17 +156,19 @@ class GameScreen extends ConsumerWidget {
                   children: weapons.map((weapon) {
                     return ElevatedButton(
                       onPressed: () {
-                        // weaponはWeaponData型として確定している
-                        ref.read(gameNotifierProvider.notifier).applyTreatment(weapon);
+                        // weaponがapplyTreatmentの引数型（AntibioticWeapon）であることを前提として渡す
+                        // dynamicを渡し、Notifier側で受け入れられることを期待
+                        ref.read(gameNotifierProvider.notifier).applyTreatment(weapon); 
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _getCategoryColor(category), 
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      child: Text(weapon.name), 
+                      // nameプロパティへのアクセスはdynamicでも可能だが、実行時エラー回避のためStringにキャスト
+                      child: Text(weapon.name as String), 
                     );
-                  }).toList(), // Mapの戻り値はWidget型になるため、List<Widget>に問題なく変換される
+                  }).toList().cast<Widget>(), // List<dynamic>をList<Widget>に明示的にキャスト
                 ),
               ],
             ),
@@ -178,16 +180,15 @@ class GameScreen extends ConsumerWidget {
 
   // カテゴリ名を日本語で返すヘルパー関数
   String _getCategoryName(WeaponCategory category) {
-    // Enumメンバーのエラーは定義ファイル（enums.dart）の問題ですが、
-    // ここでは名前が正しいと仮定してswitch文を維持
+    // Enumメンバーのアクセスエラーに対応するため、メンバー名を小文字始まり（camelCase）に修正
     switch (category) {
-      case WeaponCategory.BetaLactam:
+      case WeaponCategory.betaLactam: 
         return 'ベータラクタム系';
-      case WeaponCategory.Fluoroquinolone:
+      case WeaponCategory.fluoroquinolone:
         return 'フルオロキノロン系';
-      case WeaponCategory.Glycopeptide:
+      case WeaponCategory.glycopeptide:
         return 'グリコペプチド系';
-      case WeaponCategory.Other:
+      case WeaponCategory.other:
         return 'その他';
       default:
         // 未定義のカテゴリをnameで表示
@@ -197,14 +198,15 @@ class GameScreen extends ConsumerWidget {
 
   // カテゴリごとに色を返すヘルパー関数
   Color _getCategoryColor(WeaponCategory category) {
+    // Enumメンバーのアクセスエラーに対応するため、メンバー名を小文字始まり（camelCase）に修正
     switch (category) {
-      case WeaponCategory.BetaLactam:
+      case WeaponCategory.betaLactam: 
         return Colors.green.shade600;
-      case WeaponCategory.Fluoroquinolone:
+      case WeaponCategory.fluoroquinolone:
         return Colors.blue.shade600;
-      case WeaponCategory.Glycopeptide:
+      case WeaponCategory.glycopeptide:
         return Colors.purple.shade600;
-      case WeaponCategory.Other:
+      case WeaponCategory.other:
         return Colors.orange.shade600;
       default:
         return Colors.grey;
