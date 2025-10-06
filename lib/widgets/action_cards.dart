@@ -1,3 +1,5 @@
+// lib/widgets/action_cards.dart のコード全体
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/game_notifier.dart';
@@ -38,6 +40,7 @@ class ActionCards extends ConsumerWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
+              // ★修正: MaterialColorを直接渡す
               _buildSupportCard(notifier, SupportAction.Inspection, '検査', Icons.search, Colors.blue),
               _buildSupportCard(notifier, SupportAction.SourceControl, '感染源制御', Icons.clean_hands, Colors.purple),
             ],
@@ -97,11 +100,12 @@ class ActionCards extends ConsumerWidget {
   }
 
   // サポートカードの生成
-  Widget _buildSupportCard(GameNotifier notifier, SupportAction action, String label, IconData icon, Color color) {
+  // ★修正: color引数をMaterialColor型として受け取る (または型をMaterialColorに変更)
+  Widget _buildSupportCard(GameNotifier notifier, SupportAction action, String label, IconData icon, MaterialColor color) {
     return Expanded(
       child: Card(
         elevation: 2,
-        color: color.withOpacity(0.1),
+        color: color.shade50, // shade50はMaterialColorで定義されているためOK
         child: InkWell(
           onTap: () => notifier.performSupportAction(action),
           child: Container(
@@ -109,8 +113,10 @@ class ActionCards extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // ★修正: color.shade700がMaterialColorでのみ使用可能
                 Icon(icon, size: 20, color: color.shade700),
                 const SizedBox(width: 8),
+                // ★修正: color.shade700がMaterialColorでのみ使用可能
                 Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: color.shade700)),
               ],
             ),
