@@ -14,18 +14,21 @@ class GameScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gameState = ref.watch(gameNotifierProvider);
     
-    // 状態変更を伴う可能性のあるisGameOverの呼び出しと画面遷移ロジックを、
-    // ビルドサイクルの後に実行されるように遅延させる (Riverpodエラー回避の推奨手法)
+    // ゲームオーバー判定と画面遷移ロジックを、ビルドサイクルの後に実行するように遅延
     Future.microtask(() {
       final notifier = ref.read(gameNotifierProvider.notifier);
       if (notifier.isGameOver) {
-        // ゲームオーバーが確定したら、ResultScreenへ遷移
+        
+        // ★修正: 画面遷移の前に、分離したログ記録メソッドを呼び出す
+        notifier.recordEndGameLog();
+        
+        // ResultScreenへ遷移
         Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const ResultScreen()));
       }
     });
 
-    // ゲームオーバーが確定した場合、遷移が完了するまでの間はローディング画面を表示
+    // isGameOver判定が遅延されたため、ここではローディング画面を表示
     if (ref.read(gameNotifierProvider.notifier).isGameOver) {
         return const Scaffold(body: Center(child: Text('治療結果を評価中...')));
     }

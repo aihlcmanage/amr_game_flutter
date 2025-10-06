@@ -11,7 +11,6 @@ const int MAX_ALLOWED_TURN = TARGET_TURN_FOR_WARNING * 2; // 20ターン
 
 // GameNotifierのインスタンスを提供するProvider
 final gameNotifierProvider = StateNotifierProvider<GameNotifier, GameState>((ref) {
-  // 初期状態は仮のデータで設定（startGameで上書きされる）
   final initialCase = CASE_DATA.first;
   final initialEnemy = ENEMY_DATA.firstWhere((e) => e.id == initialCase.enemyId);
 
@@ -39,12 +38,8 @@ class GameNotifier extends StateNotifier<GameState> {
       return true;
     }
     
-    // ★敗北条件 2: 膠着状態での強制終了 (重症度が10%を超えていて、ターン数が許容限界を超えた場合)
+    // ★修正: 敗北条件 2: 膠着状態での強制終了 (純粋な判定のみ、状態変更は行わない)
     if (state.currentSeverity > 10.0 && state.currentTurn > MAX_ALLOWED_TURN) {
-        // ログに強制終了の理由を追加
-        state = state.copyWith(
-            logMessages: ['🚨 判定: 治療が長期化し、許容ターン数を超えました。治療失敗と判定されます。', ...state.logMessages]
-        );
         return true;
     }
 
@@ -62,7 +57,6 @@ class GameNotifier extends StateNotifier<GameState> {
   void startGame(PatientCase selectedCase) {
     final initialEnemy = ENEMY_DATA.firstWhere((e) => e.id == selectedCase.enemyId);
     
-    // 選択された症例に合わせて状態を初期化
     state = GameState(
       currentCase: selectedCase,
       currentEnemy: initialEnemy,
@@ -151,7 +145,6 @@ class GameNotifier extends StateNotifier<GameState> {
     
     // ログメッセージの生成
     final List<String> newLogs = [
-      // ログの文字数を減らし、数値を明確化
       '💉 投薬: ${weapon.name} | Dmg: ${finalDamage.toInt()} | Risk: ${riskIncrease.toStringAsFixed(2)} | Cost: ${costIncrease.toStringAsFixed(1)}',
       if (educationLog.isNotEmpty) educationLog,
       if (newSensitivity < state.currentSensitivityScore) '🚨 ペナルティ: 耐性獲得の閾値を超えました。感受性が ${newSensitivity.toStringAsFixed(2)} に低下！',
@@ -228,12 +221,32 @@ class GameNotifier extends StateNotifier<GameState> {
   }
   
   // --------------------------------------------------
-  // 5. ★ギブアップ機能
+  // 5. ギブアップ機能と膠着敗北時のログ記録
   // --------------------------------------------------
+  
+  void recordEndGameLog() {
+    if (state.currentSeverity >= 100.0) {
+      // 敗北 100%
+      state = state.copyWith(
+          logMessages: ['🚨 判定: 重症度が100%に達し、治療失敗と判定されました。', ...state.logMessages]
+      );
+    } else if (state.currentSeverity > 10.0 && state.currentTurn > MAX_ALLOWED_TURN) {
+      // 敗北 膠着状態
+      state = state.copyWith(
+          logMessages: ['🚨 判定: 治療が長期化し、許容ターン数を超えました。治療失敗と判定されます。', ...state.logMessages]
+      );
+    } else if (state.currentSeverity <= 10.0) {
+      // 勝利
+      state = state.copyWith(
+          logMessages: ['✅ 判定: 重症度が10%以下となり、治療成功と判定されました。', ...state.logMessages]
+      );
+    }
+  }
+
   void surrender() {
     if (isGameOver) return;
     
-    // ギブアップを敗北として処理するため、重症度を100%に設定し、ResultScreenに遷移させる
+    // ギブアップを敗北として処理するため、重症度を100%に設定
     state = state.copyWith(
       currentSeverity: 100.0,
       logMessages: ['⛔️ ギブアップ: プレイヤーが治療を断念しました。治療失敗として評価されます。', ...state.logMessages],
